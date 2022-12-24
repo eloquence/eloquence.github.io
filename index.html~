@@ -3,7 +3,9 @@
 <b>FPF stuff:</b>
 <ul>
   <li><a href="workstation/">Minimal workstation prototype</a>
-  <li><a href="workstation-advanced/">Advanced workstation prototype</a>
+  <li><a href="workstation-advanced/">Advanced workstation prototype
+  (probably a dead end)</a>
+  <li><a href="workstation-messaging/">Messaging prototype</a>
 </ul>
 
 <p>
