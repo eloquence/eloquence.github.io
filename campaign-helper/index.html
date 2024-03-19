@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campaign Tracking Helper</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 2.5em;
+    }
+    .editor {
+        border: 1px solid #ccc;
+        margin: 10px 0;
+        padding: 10px;
+        min-height: 30vh;
+        max-height: 60vh; /* 60% of the viewport height */
+        overflow-y: auto; /* Enable vertical scrolling */
+    }
+    input, textarea, button {
+        display: block;
+        margin: 10px 0;
+    }
+    textarea {
+        width: 100%;
+        display: none;
+    }
+    button {
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+<h1>Add campaign tracking links</h1>
+
+Copy and paste rich content below.
+<ul>
+<li>You can copy directly from Google Docs.</li>
+<li>You can copy multiple paragraphs.</li>
+<li>Avoid copying images.</li>
+</ul>
+This tool will add Matomo tracking to all <a href="https://freedom.press" target="_blank">formatted links</a> in your paste that link to a Freedom of the Press Foundation site.
+
+
+<div contenteditable="true" id="editor" class="editor"></div>
+
+<!-- This field should not need to be manually edited. It is used to set the tracking parameter. -->
+<input type="hidden" id="trackingParameter" value="mtm_campaign">
+
+<!-- This field is prepopulated via helper.js -->
+<label for="campaignName">Campaign Name</label>
+<input type="text" id="campaignName">
+
+<textarea id="domains" rows="4">
+freedom.press
+securedrop.org
+pressfreedomtracker.us
+</textarea>
+
+<button id="applyTracking">Apply Tracking</button>
+
+<script src="helper.js"></script>
+<div id="results"></div>
+
+<button id="copyBtn">Copy result to clipboard</button>
+</body>
+</html>
