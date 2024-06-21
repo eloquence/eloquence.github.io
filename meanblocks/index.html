@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mean Blocks!</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #1a1a2e;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+        #game-container { display: flex; align-items: flex-start; }
+        #game-board {
+            border: 4px solid #4a4e69;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        #side-panel { margin-left: 20px; text-align: center; }
+        #next-piece-canvas {
+            border: 2px solid #4a4e69;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        #score, #level {
+            font-size: 24px;
+            margin-top: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        #controls {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #9a8c98;
+        }
+        #difficulty-indicator {
+            width: 100%;
+            height: 5px;
+            background-color: #4a4e69;
+            margin-top: 10px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        #difficulty-progress {
+            height: 100%;
+            width: 0;
+            background-color: #8ac926;
+            transition: width 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-board" width="300" height="600"></canvas>
+        <div id="side-panel">
+            <canvas id="next-piece-canvas" width="120" height="120"></canvas>
+            <div id="score">Score: 0</div>
+            <div id="level">Level: 1</div>
+            <div id="difficulty-indicator"><div id="difficulty-progress"></div></div>
+            <div id="controls">
+                ← → : Move | ↑ : Rotate | ↓ : Soft Drop | Space : Hard Drop
+            </div>
+        </div>
+    </div>
+<script>
+    const canvas = document.getElementById('game-board');
+    const ctx = canvas.getContext('2d');
+    const nextPieceCanvas = document.getElementById('next-piece-canvas');
+    const nextPieceCtx = nextPieceCanvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+    const levelElement = document.getElementById('level');
+    const difficultyProgress = document.getElementById('difficulty-progress');
+
+    // Add high score element
+    const highScoreElement = document.createElement('div');
+    highScoreElement.id = 'high-score';
+    scoreElement.parentNode.insertBefore(highScoreElement, scoreElement.nextSibling);
+
+    const ROWS = 20, COLS = 10, BLOCK_SIZE = 30;
+    const PIECES = [[[1,1,1,1]], [[1,1],[1,1]], [[1,1,1],[0,1,0]], [[1,1,1],[1,0,0]], [[1,1,1],[0,0,1]], [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]]];
+    
+    const COLOR_RANGES = [
+        ['#ff0000', '#ff3333', '#ff6666', '#ff9999', '#ffcccc'],
+        ['#ffff00', '#ffff33', '#ffff66', '#ffff99', '#ffffcc'],
+        ['#00ff00', '#33ff33', '#66ff66', '#99ff99', '#ccffcc'],
+        ['#0000ff', '#3333ff', '#6666ff', '#9999ff', '#ccccff'],
+        ['#ff00ff', '#ff33ff', '#ff66ff', '#ff99ff', '#ffccff'],
+        ['#00ffff', '#33ffff', '#66ffff', '#99ffff', '#ccffff'],
+        ['#ff8000', '#ff9933', '#ffb266', '#ffcc99', '#ffe5cc']
+    ];
+
+    let board, score, highScore, level, currentPiece, nextPiece, gameSpeed, fadingSpeed;
+    let leftWallIndicator, rightWallIndicator;
+    let pulseValue = 0;
+    let pulseDirection = 1;
+    let lastTime = 0;
+    let dropCounter = 0;
+    let fastFallMultiplier = 5;
+    let isFirstPiece = true;
+    let gameLoop;
+
+    function init() {
+        board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+        score = 0;
+        highScore = localStorage.getItem('tetrisHighScore') || 0;
+        level = 1;
+        gameSpeed = 500;
+        fadingSpeed = 0.4;
+        isFirstPiece = true;
+        currentPiece = createPiece();
+        nextPiece = createPiece();
+        drawNextPiece();
+        updateWallIndicators();
+        updateScore();
+        updateHighScore();
+        if (gameLoop) cancelAnimationFrame(gameLoop);
+        gameLoop = requestAnimationFrame(update);
+    }
+
+    function createPiece() {
+        const pieceIndex = Math.floor(Math.random() * PIECES.length);
+        const colorRange = COLOR_RANGES[pieceIndex];
+        const color = colorRange[Math.floor(Math.random() * colorRange.length)];
+        const isFastFalling = !isFirstPiece && Math.random() < 0.1;
+        isFirstPiece = false;
+        return {
+            piece: PIECES[pieceIndex],
+            color: color,
+            x: Math.floor(COLS / 2) - Math.floor(PIECES[pieceIndex][0].length / 2),
+            y: 0,
+            opacity: 1,
+            isFastFalling: isFastFalling
+        };
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        board.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value) {
+                    ctx.fillStyle = value.color;
+                    ctx.globalAlpha = value.opacity || 1;
+                    ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                }
+            });
+        });
+        ctx.fillStyle = currentPiece.color;
+        ctx.globalAlpha = currentPiece.opacity;
+        currentPiece.piece.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value) {
+                    ctx.fillRect((currentPiece.x + x) * BLOCK_SIZE, (currentPiece.y + y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    ctx.strokeRect((currentPiece.x + x) * BLOCK_SIZE, (currentPiece.y + y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                }
+            });
+        });
+        ctx.globalAlpha = 1;
+        drawWallIndicators();
+    }
+
+    function drawWallIndicators() {
+        ctx.fillStyle = '#ffffff';
+        if (leftWallIndicator !== null) {
+            ctx.beginPath();
+            ctx.arc(0, leftWallIndicator * BLOCK_SIZE, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        if (rightWallIndicator !== null) {
+            ctx.beginPath();
+            ctx.arc(canvas.width, rightWallIndicator * BLOCK_SIZE, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    function updateWallIndicators() {
+        leftWallIndicator = rightWallIndicator = null;
+        let lowestY = -1;
+        currentPiece.piece.forEach((row, pieceY) => {
+            row.forEach((value, pieceX) => {
+                if (value) {
+                    const boardY = currentPiece.y + pieceY;
+                    if (boardY > lowestY) {
+                        lowestY = boardY;
+                        leftWallIndicator = rightWallIndicator = boardY;
+                    }
+                }
+            });
+        });
+    }
+
+    function drawNextPiece() {
+        nextPieceCtx.clearRect(0, 0, nextPieceCanvas.width, nextPieceCanvas.height);
+        
+        // Draw the piece
+        nextPieceCtx.fillStyle = nextPiece.color;
+        nextPieceCtx.strokeStyle = '#000000';
+        nextPieceCtx.lineWidth = 1;  // Set line width to 1 for the piece
+        const offsetX = (nextPieceCanvas.width - nextPiece.piece[0].length * BLOCK_SIZE) / 2;
+        const offsetY = (nextPieceCanvas.height - nextPiece.piece.length * BLOCK_SIZE) / 2;
+        nextPiece.piece.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value) {
+                    nextPieceCtx.fillRect(offsetX + x * BLOCK_SIZE, offsetY + y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    nextPieceCtx.strokeRect(offsetX + x * BLOCK_SIZE, offsetY + y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                }
+            });
+        });
+
+        // Draw pulsing red box for fast-falling pieces
+        if (nextPiece.isFastFalling) {
+            nextPieceCtx.strokeStyle = `rgba(255, 0, 0, ${0.5 + pulseValue * 0.5})`;
+            nextPieceCtx.lineWidth = 3;
+            nextPieceCtx.strokeRect(0, 0, nextPieceCanvas.width, nextPieceCanvas.height);
+        }
+    }
+
+    function collision() {
+        return currentPiece.piece.some((row, y) => {
+            return row.some((value, x) => {
+                const boardX = currentPiece.x + x;
+                const boardY = currentPiece.y + y;
+                return (
+                    value &&
+                    (boardX < 0 || boardX >= COLS || boardY >= ROWS || (boardY >= 0 && board[boardY] && board[boardY][boardX]))
+                );
+            });
+        });
+    }
+
+    function rotate() {
+        const rotated = currentPiece.piece[0].map((_, i) => currentPiece.piece.map(row => row[i]).reverse());
+        const previousPiece = currentPiece.piece;
+        currentPiece.piece = rotated;
+        if (collision()) {
+            currentPiece.piece = previousPiece;
+        }
+        updateWallIndicators();
+    }
+
+    function moveDown() {
+        currentPiece.y++;
+        if (collision()) {
+            currentPiece.y--;
+            merge();
+            clearLines();
+            currentPiece = nextPiece;
+            nextPiece = createPiece();
+            drawNextPiece();
+            updateWallIndicators();
+            if (collision()) {
+                gameOver();
+                return false;
+            }
+        }
+        updatePieceOpacity();
+        updateWallIndicators();
+        return true;
+    }
+
+    function updatePieceOpacity() {
+        const maxY = ROWS - currentPiece.piece.length;
+        const fadePoint = maxY * fadingSpeed;
+        if (currentPiece.y <= fadePoint) {
+            currentPiece.opacity = 1 - (currentPiece.y / fadePoint);
+        } else {
+            currentPiece.opacity = 0;
+        }
+    }
+
+    function merge() {
+        currentPiece.piece.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value) {
+                    board[currentPiece.y + y][currentPiece.x + x] = { color: currentPiece.color, opacity: 1 };
+                }
+            });
+        });
+    }
+
+    function clearLines() {
+        let linesToClear = [];
+        board.forEach((row, y) => {
+            if (row.every(cell => cell !== 0)) {
+                linesToClear.push(y);
+            }
+        });
+        
+        if (linesToClear.length > 0) {
+            animateClearLines(linesToClear);
+        }
+    }
+
+    function animateClearLines(lines) {
+        let opacity = 1;
+        const fadeInterval = setInterval(() => {
+            opacity -= 0.1;
+            lines.forEach(y => {
+                board[y].forEach((_, x) => {
+                    board[y][x] = { color: '#ffffff', opacity: opacity };
+                });
+            });
+            draw();
+
+            if (opacity <= 0) {
+                clearInterval(fadeInterval);
+                removeLines(lines);
+            }
+        }, 30);
+    }
+
+    function removeLines(lines) {
+        lines.forEach(y => {
+            board.splice(y, 1);
+            board.unshift(Array(COLS).fill(0));
+        });
+
+        score += lines.length === 4 ? 800 : lines.length * 100;
+        updateScore();
+        updateDifficulty();
+
+        if (lines.length === 4) {
+            tetrisAnimation();
+        }
+    }
+
+    function tetrisAnimation() {
+        const originalColor = canvas.style.borderColor;
+        let flashCount = 0;
+        const flashInterval = setInterval(() => {
+            canvas.style.borderColor = flashCount % 2 === 0 ? '#00ff00' : originalColor;
+            if (++flashCount >= 6) {
+                clearInterval(flashInterval);
+                canvas.style.borderColor = originalColor;
+            }
+        }, 100);
+    }
+
+    function updateDifficulty() {
+        const newLevel = Math.floor(score / 1000) + 1;
+        if (newLevel > level) {
+            level = newLevel;
+            gameSpeed = Math.max(100, 500 - (level - 1) * 20);
+            fadingSpeed = Math.max(0.1, 0.4 - (level - 1) * 0.02);
+            levelElement.textContent = 'Level: ' + level;
+            levelElement.style.color = '#ff595e';
+            setTimeout(() => levelElement.style.color = '#ffffff', 500);
+        }
+        difficultyProgress.style.width = (score % 1000) / 10 + '%';
+    }
+
+    function update(time = 0) {
+        const deltaTime = time - lastTime;
+        lastTime = time;
+
+        dropCounter += deltaTime;
+        if (dropCounter > (currentPiece.isFastFalling ? gameSpeed / fastFallMultiplier : gameSpeed)) {
+            moveDown();
+            dropCounter = 0;
+        }
+
+        draw();
+        drawNextPiece();
+
+        // Update pulse animation
+        pulseValue += 0.05 * pulseDirection;
+        if (pulseValue >= 1 || pulseValue <= 0) pulseDirection *= -1;
+
+        gameLoop = requestAnimationFrame(update);
+    }
+
+    function updateScore() {
+        scoreElement.textContent = 'Score: ' + score;
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('tetrisHighScore', highScore);
+            updateHighScore();
+        }
+    }
+
+    function updateHighScore() {
+        highScoreElement.textContent = 'High Score: ' + highScore;
+    }
+
+    function gameOver() {
+        cancelAnimationFrame(gameLoop);
+        alert('Game Over! Your score: ' + score);
+        init();
+    }
+
+    document.addEventListener('keydown', event => {
+        switch (event.keyCode) {
+            case 37: currentPiece.x--; if (collision()) currentPiece.x++; updateWallIndicators(); break;
+            case 39: currentPiece.x++; if (collision()) currentPiece.x--; updateWallIndicators(); break;
+            case 40: moveDown(); break;
+            case 38: rotate(); break;
+            case 32: while (!collision()) currentPiece.y++; currentPiece.y--; moveDown(); break;
+        }
+        draw();
+    });
+
+    init();
+</script>
+</body>
+</html>
