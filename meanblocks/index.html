@@ -62,7 +62,7 @@
             <div id="level">Level: 1</div>
             <div id="difficulty-indicator"><div id="difficulty-progress"></div></div>
             <div id="controls">
-                ← → : Move | ↑ : Rotate | ↓ : Soft Drop | Space : Hard Drop
+                ← → : Move | ↑ : Rotate | ↓ : Soft Drop | Space : Hard Drop | Esc : Pause
             </div>
         </div>
     </div>
@@ -97,11 +97,12 @@
     let leftWallIndicator, rightWallIndicator;
     let pulseValue = 0;
     let pulseDirection = 1;
-    let lastTime = 0;
-    let dropCounter = 0;
+    let lastTime;
+    let dropCounter;
     let fastFallMultiplier = 5;
     let isFirstPiece = true;
     let gameLoop;
+    let isPaused = false;
 
     function init() {
         board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
@@ -110,6 +111,8 @@
         level = 1;
         gameSpeed = 500;
         fadingSpeed = 0.4;
+        lastTime = 0;
+        dropCounter = 0;
         isFirstPiece = true;
         currentPiece = createPiece();
         nextPiece = createPiece();
@@ -117,6 +120,8 @@
         updateWallIndicators();
         updateScore();
         updateHighScore();
+        updateDifficulty();
+        levelElement.textContent = 'Level: ' + level;
         if (gameLoop) cancelAnimationFrame(gameLoop);
         gameLoop = requestAnimationFrame(update);
     }
@@ -354,6 +359,7 @@
     }
 
     function update(time = 0) {
+        if (isPaused) return;
         const deltaTime = time - lastTime;
         lastTime = time;
 
@@ -392,7 +398,28 @@
         init();
     }
 
+    function togglePause() {
+        isPaused = !isPaused;
+        if (isPaused) {
+            cancelAnimationFrame(gameLoop);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+        } else {
+            lastTime = performance.now();
+            gameLoop = requestAnimationFrame(update);
+        }
+    }
+
     document.addEventListener('keydown', event => {
+        if (event.keyCode === 27) { // 27 is the keyCode for Escape
+           togglePause();
+           return;
+        }
+        if (isPaused) return; // Ignore other inputs when paused
         switch (event.keyCode) {
             case 37: currentPiece.x--; if (collision()) currentPiece.x++; updateWallIndicators(); break;
             case 39: currentPiece.x++; if (collision()) currentPiece.x--; updateWallIndicators(); break;
