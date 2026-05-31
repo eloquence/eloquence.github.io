@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Multi-Prompt Edit</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app" aria-label="Two panel text editor">
+      <header class="topbar">
+        <h1>Multi-Prompt Edit</h1>
+        <button class="primary-action" type="button" id="copyCombined">Copy combined</button>
+      </header>
+
+      <section class="panels">
+        <article class="panel" data-side="left">
+          <div class="panelbar">
+            <div class="prompt-controls">
+              <button type="button" class="icon-button save-prompt" title="Save left prompt" aria-label="Save left prompt">+</button>
+              <select class="prompt-select" aria-label="Left prompts">
+                <option value="">(Select a saved prompt)</option>
+              </select>
+              <button type="button" class="icon-button retrieve" title="Load selected prompt" aria-label="Load selected prompt">↵</button>
+              <button type="button" class="icon-button rename" title="Rename selected prompt" aria-label="Rename selected prompt">✎</button>
+              <button type="button" class="icon-button delete" title="Delete selected prompt" aria-label="Delete selected prompt">×</button>
+            </div>
+            <button type="button" class="copy-side">Copy</button>
+          </div>
+          <div class="editor-shell">
+            <pre class="line-numbers" aria-hidden="true">1</pre>
+            <textarea spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Left text"></textarea>
+          </div>
+        </article>
+
+        <article class="panel" data-side="right">
+          <div class="panelbar">
+            <div class="prompt-controls">
+              <button type="button" class="icon-button save-prompt" title="Save right prompt" aria-label="Save right prompt">+</button>
+              <select class="prompt-select" aria-label="Right prompts">
+                <option value="">(Select a saved prompt)</option>
+              </select>
+              <button type="button" class="icon-button retrieve" title="Load selected prompt" aria-label="Load selected prompt">↵</button>
+              <button type="button" class="icon-button rename" title="Rename selected prompt" aria-label="Rename selected prompt">✎</button>
+              <button type="button" class="icon-button delete" title="Delete selected prompt" aria-label="Delete selected prompt">×</button>
+            </div>
+            <button type="button" class="copy-side">Copy</button>
+          </div>
+          <div class="editor-shell">
+            <pre class="line-numbers" aria-hidden="true">1</pre>
+            <textarea spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Right text"></textarea>
+          </div>
+        </article>
+      </section>
+
+      <div class="toast" role="status" aria-live="polite"></div>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
