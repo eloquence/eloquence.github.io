@@ -21,11 +21,24 @@ const formatDate = (date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const showToast = (message) => {
-  toast.textContent = message;
+const showToast = (message, action) => {
+  toast.replaceChildren(document.createTextNode(message));
+
+  if (action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      action.handler();
+      toast.classList.remove("is-visible");
+      clearTimeout(toastTimer);
+    });
+    toast.append(button);
+  }
+
   toast.classList.add("is-visible");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 1500);
+  toastTimer = setTimeout(() => toast.classList.remove("is-visible"), action ? 5000 : 1500);
 };
 
 const copyText = async (text, message) => {
@@ -135,6 +148,40 @@ const deletePrompt = (panel) => {
   showToast("Deleted");
 };
 
+const clearText = (panel) => {
+  const textarea = panel.querySelector("textarea");
+  if (!textarea.value) {
+    showToast("Already clear");
+    textarea.focus();
+    return;
+  }
+
+  const previous = {
+    value: textarea.value,
+    selectionStart: textarea.selectionStart,
+    selectionEnd: textarea.selectionEnd,
+    scrollTop: textarea.scrollTop
+  };
+
+  textarea.value = "";
+  textarea.scrollTop = 0;
+  updateLineNumbers(panel);
+  syncLineScroll(panel);
+  textarea.focus();
+
+  showToast("Cleared", {
+    label: "Undo",
+    handler: () => {
+      textarea.value = previous.value;
+      updateLineNumbers(panel);
+      textarea.focus();
+      textarea.setSelectionRange(previous.selectionStart, previous.selectionEnd);
+      textarea.scrollTop = previous.scrollTop;
+      syncLineScroll(panel);
+    }
+  });
+};
+
 panels.forEach((panel) => {
   const textarea = panel.querySelector("textarea");
   textarea.addEventListener("input", () => updateLineNumbers(panel));
@@ -144,6 +191,7 @@ panels.forEach((panel) => {
   panel.querySelector(".rename").addEventListener("click", () => renamePrompt(panel));
   panel.querySelector(".delete").addEventListener("click", () => deletePrompt(panel));
   panel.querySelector(".copy-side").addEventListener("click", () => copyText(textarea.value, "Copied"));
+  panel.querySelector(".clear-side").addEventListener("click", () => clearText(panel));
   updateLineNumbers(panel);
 });
 
